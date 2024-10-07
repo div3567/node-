@@ -1,0 +1,53 @@
+const express = require('express');
+const router = express.Router();
+ const userController = require('../apps/auth/controller/data.controller');
+// const usercontrol = require('../apps/auth/controller/product.controller');
+// const controlling = require('../apps/auth/controller/User.controller');
+const authMiddleware = require('../middleware/auth');
+// const posting = require("../apps/auth/controller/userpost.controller");
+const costumer = require("../apps/auth/controller/costumer.controller");
+// Default route to show a resource
+router.get('/', (req, res, next) => {
+  res.send('respond with a resource');
+});
+
+// // User routes
+ router.post('/signup', userController.signup);
+ router.post('/login', userController.login);
+ router.get('/allrecords', authMiddleware, userController.allrecords);
+ router.get('/allrecords2', authMiddleware, userController.allrecords2);
+// router.get('/allrecords3', authMiddleware, userController.allrecords3);
+// router.get('/singledata', authMiddleware, userController.singledata);
+// router.get('/paramsingle/:id', authMiddleware, userController.paramsingle);
+// router.post('/forgotPassword', userController.forgotPassword);
+// router.post('/verifyOtp', userController.verifyOtp);
+// router.put('/restorePassword', authMiddleware, userController.restorePassword);
+// router.put('/changePassword', authMiddleware, userController.changePassword);
+// router.put('/updateUserState/:id', authMiddleware, userController.updateUserState);
+
+// // Product routes
+// router.put('/updateProductState/:id', usercontrol.updateProductState);
+// router.post('/usersignup', usercontrol.userSignup);
+// router.post('/userlogin', usercontrol.userlogin);
+// router.post('/products', usercontrol.products);
+
+// // Nodemailer route
+// router.post('/signupuser', controlling.signupuser);
+
+// // Userpost routes
+// router.post('/createData', posting.createData);
+// router.post('/loginData', posting.loginData);
+// router.post('/userpost', authMiddleware, posting.userpost);
+// router.get('/userlists', authMiddleware, posting.userlists);
+// router.post('/comments', authMiddleware, posting.comments);
+// router.get('/commentlist', authMiddleware, posting.commentlist);
+
+
+//product controller routes
+
+router.post('/usersignup', costumer.usersignup);
+router.post('/login', costumer.login);
+router.post('/category', costumer.category);
+ router.post('/productDetails',authMiddleware,  costumer.productDetails);
+ router.get('/singleProductView/:id',authMiddleware,costumer.singleProductView);
+module.exports = router;
