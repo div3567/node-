@@ -8,3 +8,370 @@ mongoose
 }).catch((err)=>{
     console.log("connection failed",err)
 });
+
+
+
+
+
+
+//userpost model
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;    
+    
+    
+    const UserpostSchema = new Schema({
+    email: {
+        type: String,
+    },
+    password: {
+        type: String,
+    },
+    mobile: {
+        type: Number, 
+    },
+    age: {
+        type: Number,
+    },
+    State:{
+        type:Number,
+        enum:[1,2,3],
+    
+    default:1
+},
+    otp: {
+        type: Number,
+    },
+    
+      
+      
+      
+},
+        {timestamps:true}
+  ); 
+
+
+const BlogSchema = new Schema({
+    title: {
+        type:String,
+    },
+    description:{
+        type:String
+    },
+ 
+    userId: {
+       type: mongoose.Schema.Types.ObjectId,
+       ref: "Userpost"
+    },
+    StateId:{
+type:Number,
+enum:[1,2,3],
+default:1
+    },
+},{timestamps:true})
+ 
+const CommentSchema = new Schema({
+    About: {
+      type: String
+    },
+    blogId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Blog"
+    },
+   
+    body: {
+      type: String,
+    },
+  },{timestamps:true})
+  
+
+                        //   db model    //schema
+const User= mongoose.model("Userpost", UserpostSchema);
+ const Blog =mongoose.model("Blog", BlogSchema);
+ const comment =mongoose.model("comment", CommentSchema);
+ module.exports = {User,Blog,comment}
+
+
+//userpost controller
+const {User,Blog,comment} = require('../model/userpost.model');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+dotenv.config();
+const { generateOTP } = require('../../../middleware/commonfunc');
+
+
+const accountSid = 'ACc7d4fe258f61be568c7fad4a5293da7d';
+const authToken = 'b3f7938f16ea1fa45f2df2b6c4612609';
+const client = require('twilio')(accountSid, authToken);
+
+const createData = async (req, res) => {
+    try {
+        const data = req.body;
+
+      
+        const existingUser = await User.findOne({ email: data.email });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already exists. Please login instead.',
+            });
+        }
+
+      
+        const hashedPassword = await bcrypt.hash(data.password, 10);
+        data.password = hashedPassword;
+
+        const otp = generateOTP(4);
+        data.otp = otp;
+
+        
+        const newUser = new User(data); 
+        const savedUser = await newUser.save();
+
+        if (savedUser) {
+            
+            await client.messages.create({
+                body: `Your OTP is ${otp}`,
+                to: data.mobile,
+                from: "13344630087",
+            });
+
+           
+            return res.status(201).json({
+                success: true,
+                message: 'User created successfully',
+                data: savedUser, 
+            });
+        } else {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to save user data.',
+            });
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal Server Error',
+        });
+    }
+};
+
+const loginData = async (req, res) => {
+    try {
+      const data = req.body;
+  
+      const findUser = await User.findOne({ email: data.email });
+  
+      if (!findUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'User not found. Please sign up first.',
+        });
+      }
+  
+      const isPasswordMatch = await bcrypt.compare(data.password, findUser.password);
+  
+      if (!isPasswordMatch) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password does not match.',
+        });
+      }
+  
+      const payload = {
+        id: findUser._id,
+        email: findUser.email,
+      };
+  
+      const token = jwt.sign(payload, process.env.JWT_SECRET);
+  
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: findUser,
+        token: token,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+  
+
+  const userpost = async (req, res) => {
+    try {
+      const data = req.body;
+      const userId = req.user.id;
+  
+      const newBlog = new Blog(data);
+  
+      const saveData = await newBlog.save();
+      
+      const token = jwt.sign({_id:saveData._id}, process.env.JWT_SECRET);
+  
+     
+   
+
+      res.status(200).json({
+        success: true,
+        message: 'Blog created successfully',
+        data: {saveData,
+        userId:userId,
+        token:token
+    }
+      });
+    } catch (error) {
+      console.error('Userpost Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal Server Error',
+        error: error.message,
+      });
+    }
+  };
+  
+const userlists = async (req , res) => {
+    try {
+      // const userlist = await Blog.find().populate({
+      //   path:"userId",
+      //   select:"email"
+      // });
+
+      const userlist = await Blog.aggregate([
+        {
+          $lookup:{
+            from :"userposts",
+            localField:"userId",
+            foreignField:"_id",
+            as:"userdetails",
+          },
+        },{
+          $unwind:{path:"$userdetails",preserveNullAndEmptyArrays:true},
+        },
+        {
+          $project:{
+            _id:1,
+            title:1,
+            createdAt:1,
+            description:1,
+            userdetails:{
+              _id:1,
+              email:1
+            }
+          }
+        },
+      ]);
+      if (!userlist || userlist.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User list not found",
+        });
+      } else {
+        return res.status(200).json({
+          success: true,
+          message: "User list found",
+          data: userlist,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  };
+
+  const comments = async (req, res) => {
+    try {
+      const data = req.body;
+      data.blogId =  req.user._id;
+     console.log('first the shsh ', req.user)
+  const newBlog= new comment(data);
+      const savedBlog = await newBlog.save();
+  
+      return res.status(200).json({
+        success: true,
+        message: 'Commented',
+        data: data
+        
+      });
+  
+    } catch (error) {
+      console.error('Comments Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal Server Error',
+        error: error.message,
+      });
+    }
+  };
+  
+  const commentlist = async (req, res) => {
+    try {
+      const commentList = await comment.aggregate([
+      
+        {
+      
+            $lookup: {
+              from: 'blogs',
+              localField: 'blogId',
+              foreignField: '_id',
+              as: 'blogdetails',
+            },
+        },
+        {
+          $unwind: { path: '$blogdetails', preserveNullAndEmptyArrays: true },
+        },{
+          $sort:{
+            createdAt:-1
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            About: 1,
+            body: 1,
+            createdAt: 1,
+          
+            blogdetails: {
+              _id: 1,
+              title: 1,
+              description: 1,
+            },
+          },
+        },
+      ]);
+  
+      if (!commentList || commentList.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Comment list not found',
+        });
+      } else {
+        return res.status(200).json({
+          success: true,
+          message: 'Comments found',
+          data: commentList,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal Server Error',
+        error: error.message,
+      });
+    }
+  };
+  
+
+  
+  
+  module.exports = { createData, loginData, userpost, userlists, comments, commentlist };
+  
