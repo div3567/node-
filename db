@@ -375,3 +375,14 @@ const userlists = async (req , res) => {
   
   module.exports = { createData, loginData, userpost, userlists, comments, commentlist };
   
+.env file 
+PORT="2009"
+SALT_ROUND="10"
+JWT_SECRET="67899000000w89w7"
+AUTH_EMAIL="divanshu2608@gmail.com"
+AUTH_PASSWORD="tshhtnomfvrpxqpi"
+
+app.js
+app.use('/', indexRouter);
+app.use('/users', usersRouter);
+require('./db')
